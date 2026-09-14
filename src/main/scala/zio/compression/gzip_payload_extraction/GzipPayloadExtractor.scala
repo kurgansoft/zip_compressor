@@ -39,7 +39,7 @@ class GzipPayloadExtractor private(bufferSize: Int) {
     else createDecompress()
 
   private def createDecompress(): State = {
-    Decompress(bufferSize)
+    new Decompress(bufferSize)
   }
 
   def close(): Unit = state.close()
