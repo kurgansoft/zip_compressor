@@ -1,13 +1,13 @@
 package zio.compression
 
+import zio.Chunk
 import zio.compression.zip.ZipCompressor
-import zio.compression.zip.ZipEntry.CompressedZipEntry
+import zio.compression.zip.ZipEntry.{CompressedZipEntry, UncompressedZipEntry}
 import zio.stream.{ZSink, ZStream}
 import zio.test.*
 
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
-import zio.Chunk
 
 object CompressionSpec extends ZIOSpecDefault {
   
@@ -33,8 +33,14 @@ object CompressionSpec extends ZIOSpecDefault {
     entries.toMap
   }
 
+  private def calculateCRC(bytes: Chunk[Byte]): Int = {
+    val crc = new java.util.zip.CRC32()
+    crc.update(bytes.toArray)
+    (crc.getValue & 0xFFFFFFFFL).toInt
+  }
+
   def spec = suite("CompressionSpec")(
-    test("creates a ZIP archive in memory") {
+    test("zip archive from three gzipped entry") {
       val libreFranklinStream = ZStream.fromResource("google_fonts_compressed/libre_franklin.css.gz")
       val notoSansStream = ZStream.fromResource("google_fonts_compressed/noto_sans.css.gz")
       val notoSerifStream = ZStream.fromResource("google_fonts_compressed/noto_serif.css.gz")
@@ -57,6 +63,40 @@ object CompressionSpec extends ZIOSpecDefault {
         "noto_serif.css" -> ZipEntryResult(expectedNotoSerif, 8),
         "libre_franklin.css" -> ZipEntryResult(expectedLibreFranklin, 8),
       ))
+    },
+    test("zip archive from three uncompressed entry") {
+      def samplePdfStream() = ZStream.fromResource("sample.pdf")
+      def samplePngStream() = ZStream.fromResource("sample.png")
+      def sampleTxtStream() = ZStream.fromResource("sample.txt")
+
+      for {
+        samplePdfBytes <- ZStream.fromResource("sample.pdf").run(ZSink.collectAll)
+        samplePdfBytesCrc = calculateCRC(samplePdfBytes)
+
+        samplePngBytes <- ZStream.fromResource("sample.png").run(ZSink.collectAll)
+        samplePngBytesCrc = calculateCRC(samplePngBytes)
+
+        sampleTxtBytes <- ZStream.fromResource("sample.txt").run(ZSink.collectAll)
+        sampleTxtBytesCrc = calculateCRC(sampleTxtBytes)
+
+        expected1 <- samplePdfStream().runCollect
+        expected2 <- samplePngStream().runCollect
+        expected3 <- sampleTxtStream().runCollect
+        zipBytes <- ZipCompressor
+          .create(List(
+            UncompressedZipEntry("sample.pdf", samplePdfStream(), samplePdfBytesCrc, samplePdfBytes.size),
+            UncompressedZipEntry("sample.png", samplePngStream(), samplePngBytesCrc, samplePngBytes.size),
+            UncompressedZipEntry("sample.txt", sampleTxtStream(), sampleTxtBytesCrc, sampleTxtBytes.size),
+          ))
+          .run(ZSink.collectAll[Byte])
+
+        results = createMapFromZipFile(zipBytes)
+      } yield assertTrue(results == Map(
+        "sample.pdf" -> ZipEntryResult(expected1, 0),
+        "sample.png" -> ZipEntryResult(expected2, 0),
+        "sample.txt" -> ZipEntryResult(expected3, 0),
+      ))
     }
+
   )
 }

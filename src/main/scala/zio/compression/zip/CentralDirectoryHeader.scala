@@ -8,13 +8,15 @@ case class CentralDirectoryHeader(
                                    compressedSize: Long,
                                    uncompressedSize: Long,
                                    offsetOfLocalHeader: Long,
-                                   compressionMethod: CompressionMethod = DEFLATE
+                                   compressionMethod: CompressionMethod = DEFLATE,
+                                   dataDescriptorUsed: Boolean = true
                                  ) {
   lazy val asByteArray: Array[Byte] = {
     import java.nio.{ByteBuffer, ByteOrder}
 
     val filenameBytes = filename.getBytes("UTF-8")
     val filenameLength = filenameBytes.length.toShort
+    val generalPurposeFlags: Short = if (dataDescriptorUsed) 0x0008 else 0
 
     val buffer = ByteBuffer.allocate(46 + filenameLength)
     buffer.order(ByteOrder.LITTLE_ENDIAN)
@@ -22,7 +24,7 @@ case class CentralDirectoryHeader(
     buffer.putInt(0x02014b50)                 // signature
     buffer.putShort(20)                       // version made by
     buffer.putShort(20)                       // version needed to extract
-    buffer.putShort(0x0008)                   // general purpose flags (Data Descriptor)
+    buffer.putShort(generalPurposeFlags)      // general purpose flags
     buffer.putShort(compressionMethod.value)  // compression method
     buffer.putShort(0)                        // last mod time
     buffer.putShort(0)                        // last mod date

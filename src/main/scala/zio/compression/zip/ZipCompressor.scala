@@ -38,7 +38,11 @@ object ZipCompressor {
     ZStream.fromZIO(
       for {
         extractionInfo <- extractionInfoRef.get
-        dataDescriptorByteArray <- createDataDescriptor(extractionInfoRef).map(_.asByteArray)
+        dataDescriptorByteArray <-
+          if (extractionInfo.dataDescriptorNeeded)
+            createDataDescriptor(extractionInfoRef).map(_.asByteArray)
+          else
+            dataDescriptorLength.set(0).as(Array.emptyByteArray)
         _ <- dataDescriptorLength.set(dataDescriptorByteArray.length)
       } yield dataDescriptorByteArray
     ).flatMap(ZStream.fromIterable(_))
@@ -92,17 +96,22 @@ object ZipCompressor {
   ): ZStream[Any, Throwable, Byte] = ZStream.scoped(
     for {
       dataDescriptorLengthRef <- Ref.make[Int](-1)
-      localFileHeaderAsByteArray = LocalFileHeader(zipEntry.fileName, zipEntry.compressionMethod).asByteArray
 
-      (stream, extractionInfoRef) <- zipEntry match {
-        case ZipEntry.UncompressedZipEntry(_, contentStream) => for {
+      (localFileHeaderAsByteArray, stream, extractionInfoRef) <- zipEntry match {
+        case ZipEntry.IrregularUncompressedZipEntry(_, contentStream) => for {
           extractionInfoRef <- Ref.make(UncompressedExtractionInfo())
           stream = contentStream.via(UncompressedPayloadExtractor.createPipeLine(ref = extractionInfoRef))
-        } yield (stream, extractionInfoRef.asInstanceOf[Ref[ExtractionInfo]])
+          localFileHeaderAsByteArray = LocalFileHeader(zipEntry.fileName, zipEntry.compressionMethod).asByteArray
+        } yield (localFileHeaderAsByteArray, stream, extractionInfoRef.asInstanceOf[Ref[ExtractionInfo]])
+        case ZipEntry.UncompressedZipEntry(_, contentStream, crc, size) => for {
+          extractionInfoRef <- Ref.make(UncompressedExtractionInfo(crc, size, false))
+          localFileHeaderAsByteArray = LocalFileHeader.createLocalFileHeaderForStoredEntry(zipEntry.fileName, crc, size).asByteArray
+        } yield (localFileHeaderAsByteArray, contentStream, extractionInfoRef.asInstanceOf[Ref[ExtractionInfo]])
         case ZipEntry.CompressedZipEntry(_ ,contentStream) => for {
           extractionInfoRef <- Ref.make(GzipExtractionInfo())
           stream = contentStream.via(GzipPayloadExtractor.createGunzipPipeLine(ref = extractionInfoRef))
-        } yield (stream, extractionInfoRef.asInstanceOf[Ref[ExtractionInfo]])
+          localFileHeaderAsByteArray = LocalFileHeader(zipEntry.fileName, zipEntry.compressionMethod).asByteArray
+        } yield (localFileHeaderAsByteArray, stream, extractionInfoRef.asInstanceOf[Ref[ExtractionInfo]])
       }
       dataDescriptor <- createDataDescriptor(extractionInfoRef)
      } yield ZStream.fromIterable(localFileHeaderAsByteArray) ++
@@ -121,7 +130,8 @@ object ZipCompressor {
           entry.extractionInfo.compressedSize,
           entry.extractionInfo.originalSize,
           entry.offset,
-          entry.compressionMethod)
+          entry.compressionMethod,
+          entry.extractionInfo.dataDescriptorNeeded)
       )
       centralDirectoryHeadersBytes = centralDirectoryHeaders.flatMap(_.asByteArray)
       endOfCentralDirectory =
