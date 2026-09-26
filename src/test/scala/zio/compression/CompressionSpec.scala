@@ -4,7 +4,7 @@ import zio.Chunk
 import zio.compression.zip.ZipCompressor
 import zio.compression.zip.ZipEntry.{CompressedZipEntry, UncompressedZipEntry}
 import zio.stream.{ZSink, ZStream}
-import zio.test.*
+import zio.test._
 
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream

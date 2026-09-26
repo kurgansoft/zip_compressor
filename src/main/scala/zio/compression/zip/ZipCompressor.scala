@@ -18,7 +18,7 @@ object ZipCompressor {
 
   def create(list: List[ZipEntry]): ZStream[Any, Throwable, Byte] = ZStream.scoped(
     for {
-      bookKeepingRef: Ref[BookKeeper] <- Ref.make(
+      bookKeepingRef <- Ref.make(
         BookKeeper(list.map(zipEntry =>
           Entry(
             fileName = zipEntry.fileName,
@@ -97,7 +97,7 @@ object ZipCompressor {
     for {
       dataDescriptorLengthRef <- Ref.make[Int](-1)
 
-      (localFileHeaderAsByteArray, stream, extractionInfoRef) <- zipEntry match {
+      result <- zipEntry match {
         case ZipEntry.IrregularUncompressedZipEntry(_, contentStream) => for {
           extractionInfoRef <- Ref.make(UncompressedExtractionInfo())
           stream = contentStream.via(UncompressedPayloadExtractor.createPipeLine(ref = extractionInfoRef))
@@ -113,7 +113,7 @@ object ZipCompressor {
           localFileHeaderAsByteArray = LocalFileHeader(zipEntry.fileName, zipEntry.compressionMethod).asByteArray
         } yield (localFileHeaderAsByteArray, stream, extractionInfoRef.asInstanceOf[Ref[ExtractionInfo]])
       }
-      dataDescriptor <- createDataDescriptor(extractionInfoRef)
+      (localFileHeaderAsByteArray, stream, extractionInfoRef) = result
      } yield ZStream.fromIterable(localFileHeaderAsByteArray) ++
        stream ++
        createDataDescriptorStream(extractionInfoRef, dataDescriptorLengthRef) ++
@@ -145,8 +145,6 @@ object ZipCompressor {
 
   private def firstPart(list: List[ZipEntry], bookKeeperRef: Ref[BookKeeper]): ZStream[Any, Throwable, Byte] = {
     assert(list.nonEmpty)
-
-    val withoutLast = list.take(list.size - 1)
 
     def createStreamWithIndex(index: Int) = {
       val lastOne = index == list.size - 1
