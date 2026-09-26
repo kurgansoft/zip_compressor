@@ -2,7 +2,7 @@ package zio.compression.gzip_payload_extraction
 
 import zio.Chunk
 
-import java.util as ju
+import java.util.{Arrays => JArrays}
 import java.util.zip.{CRC32, Inflater}
 import scala.annotation.tailrec
 
@@ -37,7 +37,7 @@ class Decompress(
     inflater.setInput(input)
     validateChunk(inflater, buffer)
     val consumed = input.length - inflater.getRemaining
-    val compressedOutput = Chunk.fromArray(ju.Arrays.copyOf(input, consumed))
+    val compressedOutput = Chunk.fromArray(JArrays.copyOf(input, consumed))
     val leftover = input.drop(consumed)
     if (inflater.finished()) {
       val newState: CheckTrailerStep = CheckTrailerStep(Array.emptyByteArray, crc32.getValue, inflater.getBytesWritten, consumedBytes + consumed)

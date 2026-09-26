@@ -2,10 +2,12 @@ package zio.compression.gzip_payload_extraction
 
 // Adapted from zio.stream.compression.Gunzipper (zio-streams).
 
-import zio.*
+import zio._
 import zio.compression.zip.GzipExtractionInfo
-import zio.stream.compression.*
+import zio.stream.compression._
 import zio.stream.{ZChannel, ZPipeline}
+
+import scala.util.{Failure, Success, Try}
 
 /**
  * Performs few steps of parsing header, then validates the compressed body against the
@@ -45,9 +47,14 @@ class GzipPayloadExtractor private(bufferSize: Int) {
   def close(): Unit = state.close()
 
   def onChunk(c: Chunk[Byte], ref: Ref[GzipExtractionInfo])(implicit trace: Trace): ZIO[Any, CompressionException, Chunk[Byte]] = {
-    (for {
-      (chunk, info) <- ZIO.attempt {
-        val (newState, output) = state.feed(c.toArray)
+    Try(state.feed(c.toArray)) match {
+      case Failure(compressionException: CompressionException) =>
+        ZIO.fail(compressionException)
+      case Failure(exception: Exception) =>
+        ZIO.fail(CompressionException(exception))
+      case Failure(throwable: Throwable) =>
+        throw throwable
+      case Success((newState, output)) => {
         state = newState
         val extractionInfo = state match {
           case CheckTrailerStep(_, crc, expectedIsize, compressedSize) =>
@@ -57,14 +64,11 @@ class GzipPayloadExtractor private(bufferSize: Int) {
             Some(GzipExtractionInfo(crcAsInt, iSizeAsInt, compressedSizeAsInt))
           case _ => None
         }
-        (output, extractionInfo)
+        for {
+          _ <- ZIO.when(extractionInfo.nonEmpty)(ref.set(extractionInfo.get))
+        } yield output
       }
-      _ <- ZIO.when(info.nonEmpty)(ref.set(info.get))
-    } yield chunk)
-      .refineOrDie {
-        case e: java.util.zip.DataFormatException => CompressionException(e)
-        case e: CompressionException       => e
-      }
+    }
   }
 
   def onNone(implicit trace: Trace): ZIO[Any, CompressionException, Chunk[Byte]] =

@@ -24,6 +24,6 @@ jobs:
         uses: sbt/setup-sbt@v1
       - name: Build project
         id: build
-        run: sbt --batch clean compile
+        run: sbt --batch +clean +compile
       - name: Run tests
-        run: sbt --batch test
+        run: sbt --batch +test

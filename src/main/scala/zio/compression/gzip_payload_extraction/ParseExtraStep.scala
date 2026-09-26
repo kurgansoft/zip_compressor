@@ -1,6 +1,6 @@
 package zio.compression.gzip_payload_extraction
 
-import State.*
+import State._
 import zio.Chunk
 
 import java.util.zip.CRC32
