@@ -16,7 +16,7 @@ object ZipCompressor {
     }
   }
 
-  def create(list: List[ZipEntry]): ZStream[Any, Throwable, Byte] = ZStream.scoped(
+  def create(list: List[ZipEntry]): ZStream[Any, Throwable, Byte] = ZStream.fromZIO(
     for {
       bookKeepingRef <- Ref.make(
         BookKeeper(list.map(zipEntry =>
@@ -93,7 +93,7 @@ object ZipCompressor {
     index: Int,
     bookKeepingRef: Ref[BookKeeper],
     lastOne: Boolean = false
-  ): ZStream[Any, Throwable, Byte] = ZStream.scoped(
+  ): ZStream[Any, Throwable, Byte] = ZStream.fromZIO(
     for {
       dataDescriptorLengthRef <- Ref.make[Int](-1)
 
@@ -120,7 +120,7 @@ object ZipCompressor {
        createEmptyStream(bookKeepingRef, extractionInfoRef, index, localFileHeaderAsByteArray.length, dataDescriptorLengthRef, lastOne)
    ).flatten
 
-  private def createTocStream(bookKeeperRef: Ref[BookKeeper]): ZStream[Any, Throwable, Byte] = ZStream.scoped(
+  private def createTocStream(bookKeeperRef: Ref[BookKeeper]): ZStream[Any, Throwable, Byte] = ZStream.fromZIO(
     for {
       bookKeeper <- bookKeeperRef.get
       centralDirectoryHeaders = bookKeeper.entries.map(entry =>
