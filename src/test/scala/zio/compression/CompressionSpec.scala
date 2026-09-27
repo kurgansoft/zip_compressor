@@ -65,36 +65,33 @@ object CompressionSpec extends ZIOSpecDefault {
       ))
     },
     test("zip archive from three uncompressed entry") {
-      def samplePdfStream() = ZStream.fromResource("sample.pdf")
-      def samplePngStream() = ZStream.fromResource("sample.png")
-      def sampleTxtStream() = ZStream.fromResource("sample.txt")
+      val samplePdfStream = ZStream.fromResource("sample.pdf")
+      val samplePngStream = ZStream.fromResource("sample.png")
+      val sampleTxtStream = ZStream.fromResource("sample.txt")
 
       for {
-        samplePdfBytes <- ZStream.fromResource("sample.pdf").run(ZSink.collectAll)
+        samplePdfBytes <- samplePdfStream.run(ZSink.collectAll)
         samplePdfBytesCrc = calculateCRC(samplePdfBytes)
 
-        samplePngBytes <- ZStream.fromResource("sample.png").run(ZSink.collectAll)
+        samplePngBytes <- samplePngStream.run(ZSink.collectAll)
         samplePngBytesCrc = calculateCRC(samplePngBytes)
 
-        sampleTxtBytes <- ZStream.fromResource("sample.txt").run(ZSink.collectAll)
+        sampleTxtBytes <- sampleTxtStream.run(ZSink.collectAll)
         sampleTxtBytesCrc = calculateCRC(sampleTxtBytes)
 
-        expected1 <- samplePdfStream().runCollect
-        expected2 <- samplePngStream().runCollect
-        expected3 <- sampleTxtStream().runCollect
         zipBytes <- ZipCompressor
           .create(List(
-            UncompressedZipEntry("sample.pdf", samplePdfStream(), samplePdfBytesCrc, samplePdfBytes.size),
-            UncompressedZipEntry("sample.png", samplePngStream(), samplePngBytesCrc, samplePngBytes.size),
-            UncompressedZipEntry("sample.txt", sampleTxtStream(), sampleTxtBytesCrc, sampleTxtBytes.size),
+            UncompressedZipEntry("sample.pdf", samplePdfStream, samplePdfBytesCrc, samplePdfBytes.size),
+            UncompressedZipEntry("sample.png", samplePngStream, samplePngBytesCrc, samplePngBytes.size),
+            UncompressedZipEntry("sample.txt", sampleTxtStream, sampleTxtBytesCrc, sampleTxtBytes.size),
           ))
           .run(ZSink.collectAll[Byte])
 
         results = createMapFromZipFile(zipBytes)
       } yield assertTrue(results == Map(
-        "sample.pdf" -> ZipEntryResult(expected1, 0),
-        "sample.png" -> ZipEntryResult(expected2, 0),
-        "sample.txt" -> ZipEntryResult(expected3, 0),
+        "sample.pdf" -> ZipEntryResult(samplePdfBytes, 0),
+        "sample.png" -> ZipEntryResult(samplePngBytes, 0),
+        "sample.txt" -> ZipEntryResult(sampleTxtBytes, 0),
       ))
     }
 
