@@ -7,7 +7,7 @@ import java.io.IOException
 import java.util.zip.CRC32
 
 object UncompressedPayloadExtractor {
-  def createPipeLine(bufferSize: Int = 64 * 1024, ref: Ref[UncompressedExtractionInfo]): ZPipeline[Any, IOException, Byte, Byte] = {
+  def createPipeLine(ref: Ref[UncompressedExtractionInfo]): ZPipeline[Any, IOException, Byte, Byte] = {
     val crc = new CRC32()
     ZPipeline.fromPush {
       for {

@@ -4,10 +4,10 @@ import zio.compression.zip.CompressionMethod.DEFLATE
 
 case class CentralDirectoryHeader(
                                    filename: String,
-                                   crc32: Long,
-                                   compressedSize: Long,
-                                   uncompressedSize: Long,
-                                   offsetOfLocalHeader: Long,
+                                   crc32: Int,
+                                   compressedSize: Int,
+                                   uncompressedSize: Int,
+                                   offsetOfLocalHeader: Int,
                                    compressionMethod: CompressionMethod = DEFLATE,
                                    dataDescriptorUsed: Boolean = true
                                  ) {
@@ -28,16 +28,16 @@ case class CentralDirectoryHeader(
     buffer.putShort(compressionMethod.value)  // compression method
     buffer.putShort(0)                        // last mod time
     buffer.putShort(0)                        // last mod date
-    buffer.putInt(crc32.toInt)                // CRC-32
-    buffer.putInt(compressedSize.toInt)       // compressed size
-    buffer.putInt(uncompressedSize.toInt)     // uncompressed size
+    buffer.putInt(crc32)                      // CRC-32
+    buffer.putInt(compressedSize)             // compressed size
+    buffer.putInt(uncompressedSize)           // uncompressed size
     buffer.putShort(filenameLength)           // filename length
     buffer.putShort(0)                        // extra field length
     buffer.putShort(0)                        // file comment length
     buffer.putShort(0)                        // disk number start
     buffer.putShort(0)                        // internal file attributes
     buffer.putInt(0)                          // external file attributes
-    buffer.putInt(offsetOfLocalHeader.toInt)  // relative offset of local header
+    buffer.putInt(offsetOfLocalHeader)        // relative offset of local header
     buffer.put(filenameBytes)                 // filename
 
     buffer.array()

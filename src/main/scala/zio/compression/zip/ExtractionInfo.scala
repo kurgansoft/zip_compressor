@@ -1,6 +1,5 @@
 package zio.compression.zip
 
-import zio.compression.zip.CompressionMethod
 import zio.compression.zip.CompressionMethod.{DEFLATE, STORE}
 
 sealed trait ExtractionInfo {

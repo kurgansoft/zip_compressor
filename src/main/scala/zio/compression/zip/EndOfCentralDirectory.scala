@@ -2,8 +2,8 @@ package zio.compression.zip
 
 case class EndOfCentralDirectory(
                                   totalEntries: Int,
-                                  centralDirectorySize: Long,
-                                  centralDirectoryOffset: Long
+                                  centralDirectorySize: Int,
+                                  centralDirectoryOffset: Int
                                 ) {
   lazy val asByteArray: Array[Byte] = {
     import java.nio.{ByteBuffer, ByteOrder}
@@ -16,8 +16,8 @@ case class EndOfCentralDirectory(
     buffer.putShort(0)                      // disk with central directory
     buffer.putShort(totalEntries.toShort)   // entries on this disk
     buffer.putShort(totalEntries.toShort)   // total entries
-    buffer.putInt(centralDirectorySize.toInt) // size of central directory
-    buffer.putInt(centralDirectoryOffset.toInt) // offset of central directory
+    buffer.putInt(centralDirectorySize)     // size of central directory
+    buffer.putInt(centralDirectoryOffset)   // offset of central directory
     buffer.putShort(0)                      // comment length
 
     buffer.array()
